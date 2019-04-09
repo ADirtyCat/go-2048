@@ -1,4 +1,4 @@
-## introduction
+## Introduction
 
 It's made from Golang 2048 is a great game made by JavaScript. 
 This app works on command and helps your help you quickly start Golang learning 
