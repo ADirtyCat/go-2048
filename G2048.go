@@ -17,11 +17,9 @@ const (
 	WIN  Status = iota
 	LOSE
 	ADD
-	MAX  = 2048
+	MAX  = 64
 )
 
-var screenWidth int
-var screenHeight int
 var helpInfo = []string{
 	"Enter: Restart the game.",
 	"Esc: \t Quit the game.",
@@ -41,7 +39,6 @@ var colorMap = map[int]termbox.Attribute{
 var mrgLen int = 4 // 边距
 var arrLen int     // 矩阵长度
 
-// TODO 计算分数 & 步数
 var Step int
 var Score int
 
@@ -64,9 +61,9 @@ func PrintStrEnd(str string) error {
 	str += time.Now().Format(" 15:04:05")
 	fg := termbox.ColorYellow
 	bg := termbox.ColorBlack
-	//x = x + 4 - len(str)/2
+	y := len(helpInfo) + arrLen*mrgLen + mrgLen*2
 	for offsetX, char := range str {
-		termbox.SetCell(mrgLen+offsetX, screenHeight-3, char, fg, bg)
+		termbox.SetCell(mrgLen+offsetX, y+1, char, fg, bg)
 	}
 	termbox.Flush()
 	return nil
@@ -95,18 +92,6 @@ func (p *G2048) Init(cellNumber int) *G2048 {
 	}
 	*p = v
 	return p
-	/*var v [][]int
-	var num int
-	for i := 0; i < cellNumber; i++ {
-		var tmp []int
-		for j := 0; j < cellNumber; j++ {
-			tmp = append(tmp, num)
-			num++
-		}
-		v = append(v, tmp)
-	}
-	*p = v
-	arrLen = cellNumber*/
 }
 
 // 检查游戏是否已经胜利，没有胜利的情况下随机将值为0的元素
@@ -228,23 +213,23 @@ func (p *G2048) Right180() {
 }
 
 // 向上移动合并转换为向上移动合并
-func (p *G2048) mergeUp() bool {
+func (p *G2048) mergeUp() (bool, bool) {
 	p.Left90()
-	change := p.mergeLeft()
+	change, isFull := p.mergeLeft()
 	p.Right90()
-	return change
+	return change, isFull
 }
 
 // 向下移动合并转换为向下移动合并
-func (p *G2048) mergeDown() bool {
+func (p *G2048) mergeDown() (bool, bool) {
 	p.Right90()
-	change := p.mergeLeft()
+	change, isFull := p.mergeLeft()
 	p.Left90()
-	return change
+	return change, isFull
 }
 
 /// 向左移动合并转换为向左移动合并
-func (p *G2048) mergeLeft() bool {
+func (p *G2048) mergeLeft() (bool, bool) {
 	isChange := false
 	isFull := true
 	// 将元素向左靠拢
@@ -279,22 +264,22 @@ func (p *G2048) mergeLeft() bool {
 			}
 		}
 	}
-	return isChange || isFull
+	return isChange || isFull, isFull
 }
 
 /// 向右移动合并转换为向上移动合并
-func (p *G2048) mergeRight() bool {
+func (p *G2048) mergeRight() (bool, bool) {
 	p.Right180()
-	change := p.mergeLeft()
+	change, isFull := p.mergeLeft()
 	p.Right180()
-	return change
+	return change, isFull
 }
 
 // 检查按键，做出不同的移动动作或者退出程序
 func (p *G2048) mrgeAndReturnKey() termbox.Key {
-	var changed bool
+	var changed, isFull bool
 Loop:
-	changed = false
+	changed, isFull = false, false
 	ch := make(chan termbox.Event)
 	go func() {
 		ev := termbox.PollEvent()
@@ -305,27 +290,26 @@ Loop:
 		case termbox.EventKey:
 			switch ev.Key {
 			case termbox.KeyArrowUp:
-				changed = p.mergeUp()
+				changed, isFull = p.mergeUp()
 				PrintStrEnd("Your press upKey:" + fmt.Sprintf("%t", changed))
 			case termbox.KeyArrowDown:
-				changed = p.mergeDown()
+				changed, isFull = p.mergeDown()
 				PrintStrEnd("Your press downKey:" + fmt.Sprintf("%t", changed))
 			case termbox.KeyArrowLeft:
-				changed = p.mergeLeft()
+				changed, isFull = p.mergeLeft()
 				PrintStrEnd("Your press leftKey:" + fmt.Sprintf("%t", changed))
 			case termbox.KeyArrowRight:
-				changed = p.mergeRight()
+				changed, isFull = p.mergeRight()
 				PrintStrEnd("Your press rightKey:" + fmt.Sprintf("%t", changed))
 			case termbox.KeyEsc, termbox.KeyEnter:
 				changed = true
-				/*case termbox.EventError:
-					panic(ev.Err)*/
 			default:
 				changed = false
 			}
-			//PrintStrEnd("1 .........")
 			if changed {
-				Step++
+				if (!isFull) {
+					Step++
+				}
 				return ev.Key
 			} else {
 				close(ch)
@@ -355,17 +339,18 @@ func (p *G2048) Run() {
 	defer termbox.Close()
 	rand.Seed(time.Now().UnixNano())
 Loop:
-	screenWidth, screenHeight = termbox.Size()
 	p.clear()
 	for {
+		p.initialize()
 		status := p.checkWinOrAdd()
 		switch status {
 		case LOSE:
 			PrintStrEnd("Game Lose.")
+			break
 		case WIN:
 			PrintStrEnd("Game Win")
+			break
 		}
-		p.initialize()
 		enKey := p.mrgeAndReturnKey()
 		if enKey == termbox.KeyEsc {
 			return
