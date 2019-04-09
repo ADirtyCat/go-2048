@@ -377,6 +377,6 @@ Loop:
 
 func main() {
 	game := new(G2048)
-	game.Init(12)
+	game.Init(4)
 	game.Run()
 }
